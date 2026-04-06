@@ -17,36 +17,48 @@ export async function GET() {
     const data = await response.json();
     const items = data?.response?.items || [];
 
-    const matches = items.map((m: any) => ({
-      id: m.match_id,
-      shortTitle: m.short_title,
-      status: m.status_str,
-      statusNote: m.status_note,
-      startTime: m.date_start_ist,
+    const matches = items.map((m: any) => {
+      // Extract names from short_title like "RCB vs CSK"
+      let teamAName = "TBD";
+      let teamBName = "TBD";
 
-      teamA: {
-        id: m.teama_team_id,
-        name: m.teama_short_name,
-        logo: m.teama_logo_url,
-        score: m.teama_scores,
-        overs: m.teama_overs,
-      },
+      if (m.short_title && m.short_title.includes(" vs ")) {
+        const parts = m.short_title.split(" vs ");
+        teamAName = parts[0];
+        teamBName = parts[1];
+      }
 
-      teamB: {
-        id: m.teamb_team_id,
-        name: m.teamb_short_name,
-        logo: m.teamb_logo_url,
-        score: m.teamb_scores,
-        overs: m.teamb_overs,
-      },
+      return {
+        id: m.match_id,
+        shortTitle: m.short_title,
+        status: m.status_str,
+        statusNote: m.status_note,
+        startTime: m.date_start_ist,
 
-      venue: {
-        name: m.venue_name,
-        location: m.venue_location,
-      },
+        teamA: {
+          id: m.teama_team_id,
+          name: teamAName,
+          logo: m.teama_logo_url,
+          score: m.teama_scores,
+          overs: m.teama_overs,
+        },
 
-      result: m.result,
-    }));
+        teamB: {
+          id: m.teamb_team_id,
+          name: teamBName,
+          logo: m.teamb_logo_url,
+          score: m.teamb_scores,
+          overs: m.teamb_overs,
+        },
+
+        venue: {
+          name: m.venue_name,
+          location: m.venue_location,
+        },
+
+        result: m.result,
+      };
+    });
 
     return NextResponse.json(matches);
   } catch (error) {

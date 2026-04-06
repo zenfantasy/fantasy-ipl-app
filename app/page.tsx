@@ -39,7 +39,7 @@ export default function Home() {
 
   const getCountdown = (startTime: string) => {
     const diff = new Date(startTime).getTime() - timeNow;
-    if (diff <= 0) return "Live / Started";
+    if (diff <= 0) return "Live";
 
     const hrs = Math.floor(diff / (1000 * 60 * 60));
     const mins = Math.floor((diff / (1000 * 60)) % 60);
@@ -52,6 +52,23 @@ export default function Home() {
     return <div className="p-4">Loading matches...</div>;
   }
 
+  // --- FILTERING LOGIC ---
+  const now = new Date();
+
+  const upcomingMatches = matches
+    .filter((m) => new Date(m.startTime) > now)
+    .sort(
+      (a, b) =>
+        new Date(a.startTime).getTime() -
+        new Date(b.startTime).getTime()
+    );
+
+  const liveMatches = matches.filter((m) =>
+    m.status.toLowerCase().includes("live")
+  );
+
+  const nextMatch = liveMatches[0] || upcomingMatches[0];
+
   return (
     <main className="min-h-screen bg-[#f7f7f5] text-gray-800 p-4">
       <div className="max-w-md mx-auto space-y-6">
@@ -61,31 +78,33 @@ export default function Home() {
         </h1>
 
         {/* Next Match */}
-        <div>
-          <h2 className="text-sm text-gray-500 mb-2">Next Match</h2>
+        {nextMatch && (
+          <div>
+            <h2 className="text-sm text-gray-500 mb-2">Next Match</h2>
 
-          <div className="bg-white rounded-2xl p-4 shadow-sm border">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">
-                {matches[0].teamA.name} vs {matches[0].teamB.name}
-              </span>
-              <span className="text-xs text-gray-500">
-                {getCountdown(matches[0].startTime)}
-              </span>
-            </div>
+            <div className="bg-white rounded-2xl p-4 shadow-sm border">
+              <div className="flex justify-between items-center">
+                <span className="font-medium">
+                  {nextMatch.teamA.name} vs {nextMatch.teamB.name}
+                </span>
+                <span className="text-xs text-gray-500">
+                  {getCountdown(nextMatch.startTime)}
+                </span>
+              </div>
 
-            <div className="text-xs text-gray-400 mt-1">
-              {matches[0].statusNote || matches[0].status}
+              <div className="text-xs text-gray-400 mt-1">
+                {nextMatch.statusNote || nextMatch.status}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Upcoming */}
         <div>
           <h2 className="text-sm text-gray-500 mb-2">Upcoming</h2>
 
           <div className="space-y-3">
-            {matches.slice(1, 5).map((match) => (
+            {upcomingMatches.slice(1, 6).map((match) => (
               <div
                 key={match.id}
                 className="bg-white rounded-2xl p-4 shadow-sm border flex justify-between"
@@ -95,7 +114,7 @@ export default function Home() {
                     {match.teamA.name} vs {match.teamB.name}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">
-                    {match.statusNote || match.status}
+                    {match.status}
                   </div>
                 </div>
 
