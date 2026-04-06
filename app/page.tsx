@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Match = {
   id: number;
@@ -17,6 +18,8 @@ type Match = {
 };
 
 export default function Home() {
+  const router = useRouter();
+
   const [matches, setMatches] = useState<Match[]>([]);
   const [timeNow, setTimeNow] = useState(Date.now());
 
@@ -52,7 +55,6 @@ export default function Home() {
     return <div className="p-4">Loading matches...</div>;
   }
 
-  // --- FILTERING LOGIC ---
   const now = new Date();
 
   const upcomingMatches = matches
@@ -69,6 +71,10 @@ export default function Home() {
 
   const nextMatch = liveMatches[0] || upcomingMatches[0];
 
+  const openMatch = (id: number) => {
+    router.push(`/match/${id}`);
+  };
+
   return (
     <main className="min-h-screen bg-[#f7f7f5] text-gray-800 p-4">
       <div className="max-w-md mx-auto space-y-6">
@@ -82,7 +88,10 @@ export default function Home() {
           <div>
             <h2 className="text-sm text-gray-500 mb-2">Next Match</h2>
 
-            <div className="bg-white rounded-2xl p-4 shadow-sm border">
+            <div
+              onClick={() => openMatch(nextMatch.id)}
+              className="bg-white rounded-2xl p-4 shadow-sm border cursor-pointer"
+            >
               <div className="flex justify-between items-center">
                 <span className="font-medium">
                   {nextMatch.teamA.name} vs {nextMatch.teamB.name}
@@ -107,7 +116,8 @@ export default function Home() {
             {upcomingMatches.slice(1, 6).map((match) => (
               <div
                 key={match.id}
-                className="bg-white rounded-2xl p-4 shadow-sm border flex justify-between"
+                onClick={() => openMatch(match.id)}
+                className="bg-white rounded-2xl p-4 shadow-sm border flex justify-between cursor-pointer"
               >
                 <div>
                   <div className="font-medium">
