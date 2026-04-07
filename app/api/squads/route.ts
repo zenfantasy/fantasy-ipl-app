@@ -12,35 +12,33 @@ export async function GET(req: Request) {
       );
     }
 
-    // --- MATCH INFO ---
-    const matchRes = await fetch(
-      `https://cricket-live-line-advance.p.rapidapi.com/matches/${matchId}/info`,
+    // --- GET MATCHES LIST (for short_title) ---
+    const matchListRes = await fetch(
+      "https://cricket-live-line-advance.p.rapidapi.com/competitions/129908/matches?paged=1&per_page=50",
       {
         headers: {
           "x-rapidapi-key": process.env.RAPIDAPI_KEY || "",
           "x-rapidapi-host":
             "cricket-live-line-advance.p.rapidapi.com",
         },
-        cache: "no-store",
       }
     );
 
-    const matchData = await matchRes.json();
-    const match = matchData?.response;
+    const matchListData = await matchListRes.json();
 
-    const teamAId = match?.teama?.team_id;
-    const teamBId = match?.teamb?.team_id;
-
-    const playingXI = new Set(
-      (match?.playing11 || []).map((p: any) => p.player_id)
+    const match = matchListData?.response?.items?.find(
+      (m: any) => String(m.match_id) === String(matchId)
     );
 
-    const substitutes = new Set(
-      (match?.substitute || []).map((p: any) => p.player_id)
-    );
+    if (!match || !match.short_title) {
+      return NextResponse.json([]);
+    }
 
-    // --- COMPETITION SQUADS ---
-    const squadRes = await fetch(
+    // extract teams from "RCB vs CSK"
+    const [teamA, teamB] = match.short_title.split(" vs ");
+
+    // --- GET SQUADS ---
+    const res = await fetch(
       "https://cricket-live-line-advance.p.rapidapi.com/competitions/129908/squads",
       {
         headers: {
@@ -48,66 +46,55 @@ export async function GET(req: Request) {
           "x-rapidapi-host":
             "cricket-live-line-advance.p.rapidapi.com",
         },
-        cache: "no-store",
       }
     );
 
-    const squadData = await squadRes.json();
-    const teams = squadData?.response?.squads || [];
+    const data = await res.json();
 
-    let players: any[] = [];
+    const squads = data.response.squads;
 
-    teams.forEach((team: any) => {
-      if (
-        team.team_id !== teamAId &&
-        team.team_id !== teamBId
-      ) {
-        return;
-      }
+    const players = squads
+      .filter((team: any) => {
+        const abbr = team.team.abbr;
+        return abbr === teamA || abbr === teamB;
+      })
+      .flatMap((team: any) => {
+        const teamAbbr = team.team.abbr;
 
-      const teamName =
-        team.team_short_name || team.team_name;
+        return team.players.map((p: any) => {
+          const raw = p.fantasy_player_rating;
 
-      team.players.forEach((p: any) => {
-        // --- FIXED FIELD MAPPING ---
-        const name =
-          p.player_name ||
-          p.name ||
-          "Unknown";
+          // --- CREDIT SCALING (6–11 range) ---
+          const credit = Math.round((raw + 2) * 2) / 2;
 
-        const role =
-          p.playing_role ||
-          p.role ||
-          "BAT";
+          return {
+            id: String(p.pid),
+            name: p.title,
 
-        const rating =
-          p.fantasy_player_rating ||
-          p.fantasy_rating ||
-          500; // safer fallback
+            role:
+              p.playing_role === "wk"
+                ? "WK"
+                : p.playing_role === "bat"
+                ? "BAT"
+                : p.playing_role === "bowl"
+                ? "BOWL"
+                : "AR",
 
-        // --- BETTER CREDIT SCALING ---
-        const credit = Math.round((rating / 100) * 10) / 2;
+            credit,
+            team: teamAbbr,
 
-        players.push({
-          id: p.player_id,
-          name,
-          role,
-          team: teamName,
-          credit,
-          isOverseas:
-            (p.country || "").toLowerCase() !== "india",
-
-          isPlaying: playingXI.has(p.player_id),
-          isSubstitute: substitutes.has(p.player_id),
+            // ✅ NEW
+            isOverseas: p.country !== "in",
+          };
         });
       });
-    });
 
     return NextResponse.json(players);
+
   } catch (error) {
     console.error(error);
     return NextResponse.json(
-      { error: "failed to fetch squads" },
+      { error: "failed" },
       { status: 500 }
     );
   }
