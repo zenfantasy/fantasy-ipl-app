@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 type Player = {
   id: string;
@@ -113,19 +114,25 @@ export default function MatchPage() {
     setViceCaptain(id);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!isTeamValid) return;
 
-    const payload = {
-      matchId,
-      players: selected.map((p) => p.id),
-      captain,
-      viceCaptain,
-    };
+    const { error } = await supabase.from("teams").insert([
+      {
+        match_id: matchId,
+        players: selected.map((p) => p.id),
+        captain,
+        vice_captain: viceCaptain,
+      },
+    ]);
 
-    console.log("TEAM SUBMITTED:", payload);
+    if (error) {
+      console.error(error);
+      alert("Error saving team");
+      return;
+    }
 
-    // later -> send to DB
+    alert("Team saved!");
   };
 
   // --- GROUP BY TEAM ---
