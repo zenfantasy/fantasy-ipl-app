@@ -21,6 +21,7 @@ export default function MatchPage() {
   const [selected, setSelected] = useState<Player[]>([]);
   const [captain, setCaptain] = useState<string | null>(null);
   const [viceCaptain, setViceCaptain] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -31,6 +32,12 @@ export default function MatchPage() {
 
     fetchPlayers();
   }, [matchId]);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    });
+  }, []);
 
   // --- CALCULATIONS ---
   const totalCredits = selected.reduce(
@@ -115,11 +122,12 @@ export default function MatchPage() {
   };
 
   const handleSubmit = async () => {
-    if (!isTeamValid) return;
+    if (!isTeamValid || !user) return;
 
     const { error } = await supabase.from("teams").insert([
       {
         match_id: matchId,
+        user_id: user.id,
         players: selected.map((p) => p.id),
         captain,
         vice_captain: viceCaptain,
@@ -295,13 +303,14 @@ export default function MatchPage() {
             {selected.length !== 11 && " • Select 11 players"}
             {captain === null && " • Select Captain"}
             {viceCaptain === null && " • Select Vice Captain"}
+            {!user && " • Must be logged in to save"}
           </div>
 
           <button
-            disabled={!isTeamValid}
+            disabled={!isTeamValid || !user}
             onClick={handleSubmit}
             className={`w-full py-3 rounded-xl text-sm ${
-              isTeamValid
+              isTeamValid && user
                 ? "bg-gray-800 text-white"
                 : "bg-gray-200 text-gray-400"
             }`}
