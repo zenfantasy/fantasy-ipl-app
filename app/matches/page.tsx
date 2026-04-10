@@ -1,160 +1,141 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { headers } from "next/headers";
+import CountdownTimer from "./CountdownTimer";
 
-type Match = {
-  id: string;
-  teamA: string;
-  teamB: string;
-  startTime: string;
+type MatchCard = {
+  match_id: string;
+  short_title: string;
+  status_str: string;
+  status_note: string;
+  date_start_ist: string;
+  teama_name: string;
+  teama_scores: string;
+  teama_overs: string;
+  teamb_name: string;
+  teamb_scores: string;
+  teamb_overs: string;
+  venue_name: string;
+  venue_location: string;
+  toss_text: string;
+  result: string;
 };
 
-export default function MatchesPage() {
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [now, setNow] = useState<Date | null>(null); // 🔥 null initially
+type MatchBucket = "live" | "upcoming" | "completed";
 
-  // set time AFTER mount → fixes hydration
-  useEffect(() => {
-    setNow(new Date());
+function toBucket(match: MatchCard): MatchBucket {
+  const status = `${match.status_str} ${match.status_note}`.toLowerCase();
 
-    const interval = setInterval(() => {
-      setNow(new Date());
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // fetch matches
-  useEffect(() => {
-    const fetchMatches = async () => {
-      const res = await fetch("/api/matches");
-      const data = await res.json();
-
-      const cleaned = data.map((m: any) => ({
-        id: String(m.id),
-        teamA: m.teamA?.name || m.teamA,
-        teamB: m.teamB?.name || m.teamB,
-        startTime: m.startTime,
-      }));
-
-      setMatches(cleaned);
-    };
-
-    fetchMatches();
-  }, []);
-
-  // 🔥 avoid rendering before client ready
-  if (!now) {
-    return (
-      <main className="min-h-screen flex items-center justify-center">
-        Loading matches...
-      </main>
-    );
+  if (status.includes("live") || status.includes("in progress") || status.includes("innings break")) {
+    return "live";
   }
 
+  if (status.includes("complete") || status.includes("won") || Boolean(match.result)) {
+    return "completed";
+  }
+
+  return "upcoming";
+}
+
+function scoreText(score: string, overs: string): string {
+  if (!score) return "Yet to bat";
+  if (!overs) return score;
+  return `${score} (${overs})`;
+}
+
+function MatchRow({ match, label, showTimer = false }: { match: MatchCard; label: string; showTimer?: boolean }) {
+  return (
+    <Link href={`/match/${match.match_id}`}>
+      <div className="bg-white rounded-2xl p-5 border cursor-pointer space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="font-medium">{match.teama_name} vs {match.teamb_name}</div>
+          <div className="text-xs text-gray-500">{label}</div>
+        </div>
+
+        <div className="text-xs text-gray-500">
+          {match.teama_name}: {scoreText(match.teama_scores, match.teama_overs)}
+        </div>
+        <div className="text-xs text-gray-500">
+          {match.teamb_name}: {scoreText(match.teamb_scores, match.teamb_overs)}
+        </div>
+
+        {(match.venue_name || match.venue_location) && (
+          <div className="text-xs text-gray-400">
+            {match.venue_name}
+            {match.venue_name && match.venue_location ? " · " : ""}
+            {match.venue_location}
+          </div>
+        )}
+
+        {match.toss_text && <div className="text-xs text-gray-400">{match.toss_text}</div>}
+        {match.result && <div className="text-xs text-green-700">{match.result}</div>}
+
+        <div className="text-sm text-gray-600">
+          {showTimer ? (
+            <CountdownTimer startTime={match.date_start_ist} fallback="Starts soon" />
+          ) : (
+            match.status_note || match.status_str
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+export default async function MatchesPage() {
+  const headerStore = await headers();
+  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
+  const host = headerStore.get("host") ?? "localhost:3000";
+
+  const res = await fetch(`${protocol}://${host}/api/matches`, {
+    cache: "no-store",
+  });
+
+  const matches: MatchCard[] = res.ok ? await res.json() : [];
+
+  const live = matches.filter((m) => toBucket(m) === "live");
+  const completed = matches.filter((m) => toBucket(m) === "completed");
   const upcoming = matches
-    .filter((m) => new Date(m.startTime) > now)
-    .sort(
-      (a, b) =>
-        new Date(a.startTime).getTime() -
-        new Date(b.startTime).getTime()
-    );
+    .filter((m) => toBucket(m) === "upcoming")
+    .sort((a, b) => new Date(a.date_start_ist).getTime() - new Date(b.date_start_ist).getTime());
 
   const nextMatch = upcoming[0];
-
-  const getCountdown = (startTime: string) => {
-    const diff =
-      new Date(startTime).getTime() - now.getTime();
-
-    if (diff <= 0) return "LIVE";
-
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const mins = Math.floor(
-      (diff % (1000 * 60 * 60)) / (1000 * 60)
-    );
-    const secs = Math.floor(
-      (diff % (1000 * 60)) / 1000
-    );
-
-    return `${hours}h ${mins}m ${secs}s`;
-  };
+  const futureUpcoming = upcoming.slice(1);
 
   return (
     <main className="min-h-screen bg-[#f7f7f5] p-4 text-gray-800">
       <div className="max-w-md mx-auto space-y-8">
+        <h1 className="text-xl font-semibold">Fantasy IPL</h1>
 
-        <h1 className="text-xl font-semibold">
-          Fantasy IPL
-        </h1>
-
-        {/* NEXT MATCH */}
         {nextMatch && (
-          <div className="space-y-2">
-            <div className="text-xs text-gray-400">
-              Next Match
-            </div>
-
-            <Link href={`/match/${nextMatch.id}`}>
-              <div className="bg-white rounded-2xl p-5 border flex justify-between items-center cursor-pointer">
-
-                <div>
-                  <div className="font-medium">
-                    {nextMatch.teamA} vs {nextMatch.teamB}
-                  </div>
-
-                  <div className="text-xs text-gray-400 mt-1">
-                    Scheduled
-                  </div>
-                </div>
-
-                <div className="text-sm text-gray-600">
-                  {getCountdown(nextMatch.startTime)}
-                </div>
-
-              </div>
-            </Link>
-          </div>
+          <section className="space-y-2">
+            <div className="text-xs text-gray-400">Next Match</div>
+            <MatchRow match={nextMatch} label="Scheduled" showTimer />
+          </section>
         )}
 
-        {/* UPCOMING */}
-        <div className="space-y-3">
-          <div className="text-xs text-gray-400">
-            Upcoming
-          </div>
+        <section className="space-y-3">
+          <div className="text-xs text-gray-400">Upcoming</div>
+          {futureUpcoming.length === 0 && <div className="text-sm text-gray-400">No additional upcoming matches.</div>}
+          {futureUpcoming.map((match) => (
+            <MatchRow key={match.match_id} match={match} label="Scheduled" showTimer />
+          ))}
+        </section>
 
-          {upcoming.slice(1).map((m) => {
-            const countdown = getCountdown(m.startTime);
-            const isLive = countdown === "LIVE";
+        <section className="space-y-3">
+          <div className="text-xs text-gray-400">Live</div>
+          {live.length === 0 && <div className="text-sm text-gray-400">No live matches right now.</div>}
+          {live.map((match) => (
+            <MatchRow key={match.match_id} match={match} label="Live" />
+          ))}
+        </section>
 
-            return (
-              <Link key={m.id} href={`/match/${m.id}`}>
-                <div className="bg-white rounded-2xl p-5 border flex justify-between items-center cursor-pointer">
-
-                  <div>
-                    <div className="font-medium">
-                      {m.teamA} vs {m.teamB}
-                    </div>
-
-                    <div className="text-xs text-gray-400 mt-1">
-                      {isLive ? "Live" : "Scheduled"}
-                    </div>
-                  </div>
-
-                  <div
-                    className={`text-sm ${
-                      isLive ? "text-green-600" : "text-gray-600"
-                    }`}
-                  >
-                    {countdown}
-                  </div>
-
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-
+        <section className="space-y-3">
+          <div className="text-xs text-gray-400">Completed</div>
+          {completed.length === 0 && <div className="text-sm text-gray-400">No completed matches yet.</div>}
+          {completed.map((match) => (
+            <MatchRow key={match.match_id} match={match} label="Completed" />
+          ))}
+        </section>
       </div>
     </main>
   );
