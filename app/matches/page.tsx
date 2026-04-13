@@ -82,6 +82,17 @@ function MatchRow({ match, label, showTimer = false }: { match: MatchCard; label
 }
 
 export default async function MatchesPage() {
+  let matches: MatchCard[] = [];
+
+  try {
+    const res = await fetch("/api/matches", {
+      cache: "no-store",
+    });
+
+    matches = res.ok ? await res.json() : [];
+  } catch (error) {
+    console.error("Failed to load normalized matches", error);
+  }
   const headerStore = await headers();
   const protocol = headerStore.get("x-forwarded-proto") ?? "http";
   const host = headerStore.get("host") ?? "localhost:3000";
