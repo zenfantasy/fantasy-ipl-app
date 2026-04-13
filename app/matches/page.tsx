@@ -1,24 +1,6 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import CountdownTimer from "./CountdownTimer";
-
-type MatchCard = {
-  match_id: string;
-  short_title: string;
-  status_str: string;
-  status_note: string;
-  date_start_ist: string;
-  teama_name: string;
-  teama_scores: string;
-  teama_overs: string;
-  teamb_name: string;
-  teamb_scores: string;
-  teamb_overs: string;
-  venue_name: string;
-  venue_location: string;
-  toss_text: string;
-  result: string;
-};
+import { fetchMatchesFromApi, type MatchCard } from "@/lib/matches";
 
 type MatchBucket = "live" | "upcoming" | "completed";
 
