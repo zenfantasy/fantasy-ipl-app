@@ -63,14 +63,36 @@ function MatchRow({ match, label, showTimer = false }: { match: MatchCard; label
   );
 }
 
-export default async function MatchesPage() {
-  let matches: MatchCard[] = [];
+async function loadMatches(): Promise<MatchCard[]> {
+  const headerStore = await headers();
+  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
+  const host = headerStore.get("host");
+
+  if (!host) {
+    console.error("Cannot fetch matches: request host header is missing.");
+    return [];
+  }
 
   try {
     matches = await fetchMatchesFromApi();
+    const res = await fetch(`${protocol}://${host}/api/matches`, {
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      console.error("Failed to load matches", res.status, res.statusText);
+      return [];
+    }
+
+    return (await res.json()) as MatchCard[];
   } catch (error) {
     console.error("Failed to load normalized matches", error);
+    return [];
   }
+}
+
+export default async function MatchesPage() {
+  const matches = await loadMatches();
 
   const live = matches.filter((m) => toBucket(m) === "live");
   const completed = matches.filter((m) => toBucket(m) === "completed");
