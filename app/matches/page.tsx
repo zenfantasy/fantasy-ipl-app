@@ -74,6 +74,7 @@ async function loadMatches(): Promise<MatchCard[]> {
   }
 
   try {
+    matches = await fetchMatchesFromApi();
     const res = await fetch(`${protocol}://${host}/api/matches`, {
       cache: "no-store",
     });
