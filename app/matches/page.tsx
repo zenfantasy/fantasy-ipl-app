@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import CountdownTimer from "./CountdownTimer";
 
 type MatchCard = {
@@ -92,6 +93,15 @@ export default async function MatchesPage() {
   } catch (error) {
     console.error("Failed to load normalized matches", error);
   }
+  const headerStore = await headers();
+  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
+  const host = headerStore.get("host") ?? "localhost:3000";
+
+  const res = await fetch(`${protocol}://${host}/api/matches`, {
+    cache: "no-store",
+  });
+
+  const matches: MatchCard[] = res.ok ? await res.json() : [];
 
   const live = matches.filter((m) => toBucket(m) === "live");
   const completed = matches.filter((m) => toBucket(m) === "completed");
